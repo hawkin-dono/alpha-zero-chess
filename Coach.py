@@ -12,7 +12,8 @@ from Arena import Arena
 from MCTS import MCTS
 from Game import Game
 import chess
-from ai.chessMain import get_best_move
+import ai.chessMain as ai
+from stockfish_ai import StockfishAI
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class Coach():
     in Game and NeuralNet. args are specified in main.py.
     """
 
-    def __init__(self, game, nnet, args):
+    def __init__(self, game, nnet, args, inference=False):
         self.game: Game = game
         self.nnet = nnet
         self.pnet = self.nnet.__class__(self.game)  # the competitor network
@@ -31,8 +32,8 @@ class Coach():
         self.mcts = MCTS(self.game, self.nnet, self.args)
         self.trainExamplesHistory = []  # history of examples from args.numItersForTrainExamplesHistory latest iterations
         self.skipFirstSelfPlay = False  # can be overriden in loadTrainExamples()
-
-    def executeEpisode(self, inference=False):
+        self.inference = inference
+    def executeEpisode(self):
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
@@ -59,7 +60,7 @@ class Coach():
             # print(board)
             episodeStep += 1
             canonicalBoard = self.game.getCanonicalForm(board, self.curPlayer)  #change perspective
-            if inference:
+            if self.inference:
                 temp = int(episodeStep < self.args.tempThreshold)
             else:
                 temp = 0
@@ -88,7 +89,7 @@ class Coach():
                 print(f'reward: {r}')
                 return [(x[0], x[2], r * ((-1) ** (x[1] != self.curPlayer))) for x in trainExamples]
             
-    def executeEpisodewithAI(self, inference=False, play_as_white=True):
+    def executeEpisodewithAI(self, ai_player, play_as_white=True):
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
@@ -108,17 +109,20 @@ class Coach():
         board = self.game.getInitBoard()
         self.curPlayer = 1
         episodeStep = 0
-        current_turn = 1
+        current_turn = play_as_white
         # if play_as_white: print('alpha zero play as white')
+        
+        if ai_player == 'stockfish':
+            stockfish = StockfishAI()
         while True:
-            # print('---------------------------------')
-            # print(board)
+            print('---------------------------------')
+            print(board)
             episodeStep += 1
             
-            if current_turn == 1:
-                # print('white move')
+            if current_turn:
+                print('white move')
                 canonicalBoard = self.game.getCanonicalForm(board, self.curPlayer)  #change perspective
-                if inference:
+                if self.inference:
                     temp = int(episodeStep < self.args.tempThreshold)
                 else:
                     temp = 0
@@ -139,28 +143,36 @@ class Coach():
                 
                 action = self.game.getCanonicalAction(action, self.curPlayer)  #change perspective of move
                 board, self.curPlayer = self.game.getNextState(board, self.curPlayer, action)
-                current_turn = 0
+                current_turn = False
             else:
-                best_move, _ = get_best_move(board, 4)
-                pi = self.game.action_to_policy(board, str(best_move))
+                if ai_player == 'ai':
+                    best_move, _ = ai.get_best_move(board, 4)
+                else:
+                    best_move = stockfish.get_best_move(board)
+                best_move = str(best_move)
                 
-                sym = self.game.getSymmetries(board, pi)                   #get symmetries of the board and policy
+                action = self.game.getCanonicalAction(best_move, self.curPlayer)  #change perspective of move
+                canonicalBoard = self.game.getCanonicalForm(board, self.curPlayer)  #change perspective
+                pi = self.game.action_to_policy(canonicalBoard, action)
+                
+                sym = self.game.getSymmetries(canonicalBoard, pi)                   #get symmetries of the board and policy
                 for b, p in sym:
                     trainExamples.append([b, self.curPlayer, p, None])
-                    
+                
                 board, self.curPlayer = self.game.getNextState(board, self.curPlayer, best_move)
-                current_turn = 1
+                
+                current_turn = True
               
 
             r = self.game.getGameEnded(board, self.curPlayer)
 
             if r != 0:
-                # print('---------------------------------')
-                # print(board)
+                print('---------------------------------')
+                print(board)
                 print(f'reward: {r}')
                 return [(x[0], x[2], r * ((-1) ** (x[1] != self.curPlayer))) for x in trainExamples]
 
-    def learn(self, playwithAI=False):
+    def learn(self, playwithAI= None):
         """
         Performs numIters iterations with numEps episodes of self-play in each
         iteration. After every iteration, it retrains neural network with
@@ -176,11 +188,11 @@ class Coach():
             if not self.skipFirstSelfPlay or i > 1:
                 iterationTrainExamples = deque([], maxlen=self.args.maxlenOfQueue)
 
-                if playwithAI:
+                if playwithAI is not None:
                     play_as_white = True
                     for _ in tqdm(range(self.args.numEps), desc="Self Play"):
                         self.mcts = MCTS(self.game, self.nnet, self.args)
-                        iterationTrainExamples += self.executeEpisodewithAI(play_as_white= play_as_white)
+                        iterationTrainExamples += self.executeEpisodewithAI(play_as_white= play_as_white, ai_player = playwithAI)
                         play_as_white = not play_as_white
                         
                 else:

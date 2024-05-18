@@ -119,8 +119,11 @@ class Game():
             to_square = 56 + direction
             
         else: #normal move
+            # distance = np.array(to_square) - np.array(from_square)
+            # direction = direction_map[tuple(distance / np.max(np.abs(distance)))]
             distance = np.array(to_square) - np.array(from_square)
-            direction = direction_map[tuple(distance / np.max(np.abs(distance)))]
+            # direction = direction_map[tuple(distance / np.max(np.abs(distance)))]
+            direction = direction_map[tuple(np.sign(distance))]
             distance = np.max(np.abs(distance))
             to_square = direction + (distance - 1)*8
             

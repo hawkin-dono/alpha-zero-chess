@@ -24,7 +24,7 @@ args = dotdict({
     'checkpoint': './model/',
     'load_model': False,
     'load_data': False,
-    'load_folder_file': ('model/','temp.pth.tar'),
+    'load_folder_file': ('model/','checkpoint_12.pth.tar'),
     'load_data_file': ('model/', 'checkpoint_0.pth.tar'),
     'numItersForTrainExamplesHistory': 10,
 })
@@ -61,7 +61,7 @@ def main():
         log.warning('Not loading a checkpoint!')
 
     log.info('Loading the Coach...')
-    c = Coach(g, nnet, args)
+    c = Coach(g, nnet, args, inference= True)
     # c = CoachParallel(g, nnet, args)
 
     if args.load_data:
@@ -69,12 +69,10 @@ def main():
         c.loadTrainExamples()
 
     log.info('Starting the learning process 🎉')
-    c.learn(playwithAI= True)
+    c.learn(playwithAI= 'ai')
     # start = time.time()
     # c.executeEpisodewithAI()
     # print("Time taken: ", time.time() - start)
-
-
 
 if __name__ == "__main__":
     main()
