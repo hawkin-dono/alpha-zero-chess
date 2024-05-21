@@ -28,6 +28,7 @@ args = dotdict({
     'load_folder_file': ('model/','checkpoint_12.pth.tar'),
     'load_data_file': ('model/', 'checkpoint_0.pth.tar'),
     'numItersForTrainExamplesHistory': 10,
+    'gamma': 0.96,
 })
 
 class AlphaZeroAI:
@@ -50,6 +51,20 @@ class AlphaZeroAI:
         action = self.game.getCanonicalAction(action, current_player)
         
         return action 
+    
+    def get_best_move_no_sarch(self, board):
+        current_player = 1 if board.turn else -1
+        self.mcts = MCTS(self.game, self.nnet, args)
+        canonicalBoard = self.game.getCanonicalForm(board, current_player)
+        policy, v = self.nnet.predict(canonicalBoard)
+        valids = self.game.getValidMoves(canonicalBoard, 1)
+        policy = policy * valids  # masking invalid moves
+        action_idx = np.argmax(policy)
+        action = self.game.policy_idx_to_action(action_idx, board=canonicalBoard)
+        action = self.game.getCanonicalAction(action, current_player)
+        
+        return action 
+
 
 def main():
     ai = AlphaZeroAI()

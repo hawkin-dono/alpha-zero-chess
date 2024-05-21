@@ -27,6 +27,7 @@ args = dotdict({
     'load_folder_file': ('model/','checkpoint_12.pth.tar'),
     'load_data_file': ('model/', 'checkpoint_0.pth.tar'),
     'numItersForTrainExamplesHistory': 10,
+    'gamma': 0.96,
 })
 
 def get_best_move(board, current_player):
@@ -61,7 +62,7 @@ def main():
         log.warning('Not loading a checkpoint!')
 
     log.info('Loading the Coach...')
-    c = Coach(g, nnet, args, inference= True)
+    c = Coach(g, nnet, args)
     # c = CoachParallel(g, nnet, args)
 
     if args.load_data:
